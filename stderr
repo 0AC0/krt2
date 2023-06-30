@@ -1,0 +1,7 @@
+virtio_set_status vdev 0x149017200 val 0
+virtio_mmio_setting_irq virtio_mmio setting IRQ 0
+2023-06-30 22:09:16.485 qemu-system-riscv64[5192:52146] XType: failed to connect - Error Domain=NSCocoaErrorDomain Code=4099 "The connection to service named com.apple.fonts was invalidated: failed at lookup with error 3 - No such process." UserInfo={NSDebugDescription=The connection to service named com.apple.fonts was invalidated: failed at lookup with error 3 - No such process.}
+2023-06-30 22:09:16.485 qemu-system-riscv64[5192:52146] Font server protocol version mismatch (expected:5 got:0), falling back to local fonts
+2023-06-30 22:09:16.485 qemu-system-riscv64[5192:52146] XType: unable to make a connection to the font daemon!
+2023-06-30 22:09:16.485 qemu-system-riscv64[5192:52146] XType: XTFontStaticRegistry is enabled as fontd is not available.
+qemu-system-riscv64: QEMU: Terminated via GDBstub
