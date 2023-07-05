@@ -11,12 +11,13 @@ use crate::virtio::queue::AvailableRing;
 use crate::virtio::queue::UsedRing;
 use crate::virtio::queue::Elem;
 use core::mem::size_of;
+use core::panic;
 pub mod queue;
 
 const PAGE_SIZE: usize = 0x1000;
 
-#[derive(Debug)]
 #[repr(u32)]
+#[derive(Debug, Clone, Copy)]
 pub enum Formats {
    B8G8R8A8Unorm = 1,
    B8G8R8X8Unorm = 2,
@@ -28,7 +29,7 @@ pub enum Formats {
    R8G8B8X8Unorm = 134,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[repr(u32)]
 pub enum CtrlType {
    /* 2d commands */
@@ -61,8 +62,8 @@ pub enum CtrlType {
    RespErrInvalidParameter,
 }
 
-#[derive(Debug)]
-#[repr(C)]
+#[repr(packed)]
+#[derive(Debug, Clone, Copy)]
 pub struct CtrlHeader {
    pub ctrl_type: CtrlType,
    pub flags: u32,
@@ -71,6 +72,7 @@ pub struct CtrlHeader {
    pub padding: u32
 }
 
+#[repr(packed)]
 #[derive(Debug)]
 pub struct VirtioGpuResourceCreate2d {
 	pub hdr: CtrlHeader,
@@ -78,6 +80,60 @@ pub struct VirtioGpuResourceCreate2d {
 	pub format: Formats,
 	pub width: u32,
 	pub height: u32,
+}
+
+
+#[repr(packed)]
+#[derive(Debug)]
+pub struct VirtioGpuResourceAttachBacking {
+	pub hdr: CtrlHeader,
+	pub resource_id: u32,
+	pub nr_entries: u32
+}
+
+#[repr(packed)]
+#[derive(Debug)]
+pub struct VirtioGpuMemEntry {
+	pub addr: u64,
+	pub length: u32,
+	pub padding: u32,
+}
+
+#[repr(packed)]
+#[derive(Debug)]
+pub struct VirtioGpuSetScanout {
+	pub hdr: CtrlHeader,
+	pub r: VirtioGpuRect,
+	pub scanout_id: u32,
+	pub resource_id: u32,
+}
+
+#[repr(packed)]
+#[derive(Debug)]
+pub struct VirtioGpuResourceFlush {
+	pub hdr: CtrlHeader,
+	pub r: VirtioGpuRect,
+	pub resource_id: u32,
+	pub padding: u32,
+}
+
+#[repr(packed)]
+#[derive(Debug)]
+pub struct VirtioGpuTransferToHost2d {
+	pub hdr: CtrlHeader,
+	pub r: VirtioGpuRect,
+	pub offset: u64,
+	pub resource_id: u32,
+	pub padding: u32,
+}
+
+#[repr(packed)]
+#[derive(Debug, Clone, Copy)]
+pub struct VirtioGpuRect {
+	pub x: u32,
+	pub y: u32,
+	pub w: u32,
+	pub h: u32,
 }
 
 #[repr(u32)]
@@ -163,22 +219,22 @@ impl VirtioDev {
 			(ptr as *mut u32).add(MmioOffsets::QueueSel.scale::<u32>()).write_volatile(0);
 
 			let q_max = (ptr as *mut u32).add(MmioOffsets::QueueNumMax.scale::<u32>()).read_volatile();
-			(ptr as *mut u32).add(MmioOffsets::QueueNum.scale::<u32>()).write_volatile(QUEUE_SIZE);
+			(ptr as *mut u32).add(MmioOffsets::QueueNum.scale::<u32>()).write_volatile(QUEUE_SIZE as u32);
 
 			(ptr as *mut u32).add(MmioOffsets::GuestPageSize.scale::<u32>()).write_volatile(PAGE_SIZE as u32);
 
 			let q_ptr = Arc::new(Mutex::new(Box::new(Queue {
-				desc: [Descriptor { address: 0, length: 0, flags: 0, next: 0  }; 10] ,
-				aring: AvailableRing { flags: 0, index: 0, ring: [0] } ,
-				uring: UsedRing { flags: 0, index: 0, ring: [Elem { id: 0, len: 0 }], avail_event: 0 } }
-			)));
+				desc: [Descriptor { address: 0, length: 0, flags: 0, next: 0  }; QUEUE_SIZE as usize] ,
+				aring: AvailableRing { flags: 0, index: 0, ring: [0; QUEUE_SIZE as usize] } ,
+				uring: UsedRing { flags: 0, index: 0, ring: [Elem { id: 0, len: 0 }; QUEUE_SIZE as usize], avail_event: 0 },
+				free_desc: 0,
+				free_aring: 0,
+			})));
 			let q_pfn = q_ptr.lock().as_ref() as *const Queue as u32 / PAGE_SIZE as u32;
 			(ptr as *mut u32).add(MmioOffsets::QueuePfn.scale::<u32>()).write_volatile(q_pfn);
 
 			stat |= Status::DriverOk as u32;
 			(ptr as *mut u32).add(MmioOffsets::Status.scale::<u32>()).write_volatile(stat);
-			serial_println!("{:#X}", q_ptr.lock().as_ref() as *const Queue as u64);
-			serial_println!("{:#X}", q_pfn);
 		
 			return Ok( VirtioDev { mmio: ptr, queue: q_ptr } )
 		}

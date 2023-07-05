@@ -3,9 +3,9 @@
 #![feature(panic_info_message)]
 #![feature(atomic_from_mut)]
 
-use crate::bitmap_heap::BitmapAllocator;
+use crate::{bitmap_heap::BitmapAllocator, graphics::Pixel};
 use crate::graphics::GPU1;
-use riscv::asm::wfi;
+use riscv::asm::{wfi, delay};
 use riscv_rt::entry;
 //use fdt::Fdt;
 
@@ -37,9 +37,15 @@ fn find_virtio_gpu(fdt: &fdt::Fdt) -> Option<usize> {
 fn main(_hartid: usize, fdt_addr: usize) -> ! {
 	serial_println!("Hart {} with fdt: {:#X}", _hartid, fdt_addr);
 
-	GPU1.lock().init();
+	GPU1.lock().init(640, 480, 0x80200000 as *mut u8);
 
-	loop {}
+	unsafe {
+		(*(0x80200000 as *mut Pixel).add(0x1000)).r = 0xFF;
+	}
+
+	loop {
+		unsafe { delay(1000000000) }; GPU1.lock().update();
+	}
 }
 
 #[panic_handler]
