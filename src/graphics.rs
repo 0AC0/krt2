@@ -242,6 +242,12 @@ impl GPU {
 		self.flush_rect(0, 0, self.width, self.height);
 	}
 
+	pub fn putpx(&mut self, x: u32, y: u32, px: Pixel) {
+		unsafe {
+			(*(self.fb as *mut Pixel).add((x + self.width * y) as usize)) = px;
+		}
+	}
+
 }
 
 lazy_static! {
